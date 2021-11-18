@@ -52,11 +52,11 @@ ruless = [
 ]
 
 rules = {
-"Iron Ore":{"rtyp":"RawMat","T":0.5,"Ab":"IRO","harvest":"Iron Ore Patch","meth":"Craft,Miner"},
-"Copper Ore":{"rtyp":"RawMat","T":0.5,"Ab":"CPO","harvest":"Copper Ore Patch","meth":"Craft,Miner"},
-"Stone":{"rtyp":"RawMat","T":0.5,"Ab":"STO","harvest":"Stone Patch","meth":"Craft,Miner"},
-"Wood":{"rtyp":"RawMat","T":0.5,"Ab":"WOD","harvest":"Woods","meth":"Craft"},
-"Coal":{"rtyp":"RawMat","T":0.5,"Ab":"COL","harvest":"Coal Patch","meth":"Craft,Miner"},
+"Iron Ore":{"rtyp":"RawMat","T":0.5,"Ab":"IRO","harvest":"Iron Ore Patch","meth":"Harvest,Miner"},
+"Copper Ore":{"rtyp":"RawMat","T":0.5,"Ab":"CPO","harvest":"Copper Ore Patch","meth":"Harvest,Miner"},
+"Stone":{"rtyp":"RawMat","T":0.5,"Ab":"STO","harvest":"Stone Patch","meth":"Harvest,Miner"},
+"Wood":{"rtyp":"RawMat","T":0.5,"Ab":"WOD","harvest":"Woods","meth":"Harvest"},
+"Coal":{"rtyp":"RawMat","T":0.5,"Ab":"COL","harvest":"Coal Patch","meth":"Harvest,Miner"},
 "Oil":{"rtyp":"RawFluid","T":0.5,"Ab":"OIL","harvest":"Oil Patch","meth":"Oil Pump"},
 
 "Iron Plates":{"rtyp":"Item","T":3.2,"Ab":"IPL","meth":"Furnace","Req":{"IRO":1}},
@@ -77,21 +77,25 @@ rules = {
 
 "Lab":{"rtyp":"Item","T":2,"Ab":"LAB","meth":"Craft,ARBG","Req":{"YBT":4,"GER":10,"GCI":10}},
 "Red Science":{"rtyp":"Item","T":5,"Ab":"RSI","meth":"Craft,ARBG","Req":{"CPL":1,"GER":1}},
-"Automation Research":{"rtyp":"Item","T":5,"Ab":"ATR","meth":"Lab","Req":{"RSI":1,"OFP":1,"BOL":1,"SEG":1,"SPP":1,"LAB":1}},
+"Automation Research":{"rtyp":"Item","T":5,"Ab":"ATR","meth":"Lab","Req":{"RSI":10,"OFP":1,"BOL":1,"SEG":1,"SPP":1,"LAB":1}},
 
-"Assembler 1":{"rtyp":"Item","T":5,"Ab":"AS1","meth":"Craft,ARBG","Req":{"IPL":9,"GER":5,"GCI":3}},
+"Assembler 1":{"rtyp":"Item","T":5,"Ab":"AS1","meth":"Craft,ARBG","Req":{"IPL":9,"GER":5,"GCI":3,"ATR":1}},
 }
 
 class RulingClass:
 
     abdict = {}
+    reqlist = []
 
     def __init__(self):
+
+        # make abreviation lookup dict
         i = 0
         self.abdict = {}
         for itemname,rule in rules.items():
             ab = rule["Ab"]
             self.abdict[ab] = rule
+            rule["name"] = itemname
             print(f"{i} {itemname} {ab} len:{len(self.abdict)}")
             i += 1
 
@@ -111,9 +115,52 @@ class RulingClass:
         print(f"Checked rule abreviations in reqs nok:{nok} nbad:{nbad}")
 
 
+    def add_rule_to_list(self,rule):
+        self.reqlist.append(rule)
+        if not "Req" in rule:
+            # must be a raw material
+            return
+        req = rule["Req"]
+        for reqab,reqquant in req.items():
+            if not reqab in self.abdict:
+                rulename = rule["name"]
+                raise Exception(f"Error - bad abreviation {reqab} in rule {rulename}")
+            reqrule = self.abdict[reqab]
+            if reqquant==0.5:
+                reqquant = 1
+            for i in range(0,reqquant):
+                self.add_rule_to_list(reqrule)
+
+    def make_req_list(self, req:str):
+
+        if not req in self.abdict:
+            raise Exception("req not in abdict")
+
+        start_rule = self.abdict[req]
+
+        self.reqlist = []
+        self.add_rule_to_list(start_rule)
+
 
 print(f"Lazy Bastard - there are {len(rules)} rules")
 
 rc = RulingClass()
 
+makename = "AS1"
+rc.make_req_list("AS1")
 
+ncraft = 0
+nfurnace = 0
+nraw = 0
+for r in rc.reqlist:
+    meth = r["meth"]
+    if "Craft" in meth:
+        ncraft += 1
+    elif "Furnace" in meth:
+        nfurnace += 1
+    else:
+        nraw += 1
+    print(r)
+print(f"to make {makename} you need craft:{ncraft} furnace:{nfurnace} raw:{nraw}")
+
+print(f"to make {makename} you need req_list_len:{len(rc.reqlist)}")
